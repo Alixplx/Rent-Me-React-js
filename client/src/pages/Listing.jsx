@@ -1,0 +1,227 @@
+import { useMemo, useState } from "react"
+import Item from "../components/Item"
+import { useSearchParams } from "react-router-dom"
+import { dummyCars } from "../assets/data"
+
+
+const Listing = () => {
+
+    const [selectedFilters, setSelectedFilters] = useState({
+        
+        bodyType: [],
+        priceRange: []
+    })
+    const [selectedSort, setSelectedSort] = useState("")
+    const [searchQuery, setSearchQuery] = useState("")
+
+    const [searchParams] = useSearchParams()
+    const heroDestination = (searchParams.get("destination") || "").toLowerCase().trim()
+
+    const [currPage, setCurrPage] = useState(1)
+    const itemsPerPage = 6
+    const currency = '$'
+
+    const sortOptions = ["Relevant", "Low To Hiigh", "High To Low"]
+    const bodyType = ["Coupe", "SUV", "Hatchback", "Sedan", "Convertible", "Van", "Grand Tourer"]
+    const priceRange = ["0 to 20000", "20000 to 30000", "30000 to 50000", "50000 to 99000"]
+
+    // toggle Filter CheckBoxex
+    const handleFilterChange = (checked, value, type) => {
+
+        setSelectedFilters((prev) => {
+
+            const updated = {...prev}
+            if (checked) {
+
+                updated[type].push(value)
+
+            } else {
+
+                updated[type] = updated[type].filter(v => v !== value)
+            }
+            
+            return updated
+        })
+    }
+
+    // Sorting Function
+    const sortCars = (a , b) => {
+
+        if (selectedSort == "Low To Hiigh") {
+
+            return a.price.sale - b.price.sale
+        }
+        
+        if (selectedSort == "High To Low") {
+
+            return b.price.sale - a.price.sale
+        }
+
+        return 0
+    }
+
+    // Price Filters
+    const matchesPrice = (car) => {
+
+        if (selectedFilters.priceRange.length === 0) return true
+
+        return selectedFilters.priceRange.some((range) => {
+
+            const [min, max] = range.split(" to ").map(Number)
+            return car.price.sale >= min && car.price.sale <= max
+        })
+    }
+
+    // Type Filter
+    const matchesType = (car) => {
+
+        if (selectedFilters.bodyType.length === 0) return true
+        
+        return selectedFilters.bodyType.includes(car.bodyType)
+    }
+
+    // Search Filter using header's searchQuery
+    const matchesSearch = (car) => {
+
+        if (!searchQuery) return true
+
+        return (
+
+            car.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            car.city.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            car.country.toLowerCase().includes(searchQuery.toLowerCase())
+        )
+    }
+
+    // Hero Destination Filter (From Hero Form -> /Listing?destination=...)
+    const matchesHeroDestination = (car) => {
+
+        if (!heroDestination) return true
+
+        return (car.city || "").toLowerCase().includes(heroDestination)
+    }
+
+    // Filtered & Sorted Cars
+    const filteredCars = useMemo(() => {
+
+        return dummyCars.filter((c) =>
+
+            matchesType(c) &&
+            matchesPrice(c) &&
+            matchesSearch(c) &&
+            matchesHeroDestination(c)
+        
+        ).sort(sortCars)
+    
+    }, [dummyCars, selectedFilters, selectedSort, searchQuery, heroDestination])
+
+    // Handle Pagination Logic
+    const getPaginatedCard = () => {
+
+        const startIndex = (currPage - 1) * itemsPerPage
+        const endIndex = startIndex + itemsPerPage
+        
+        return filteredCars.slice(startIndex, endIndex)
+    }
+
+    const totalPages = Math.ceil(filteredCars.length / itemsPerPage)
+
+    return (
+        
+        <div className="bg-primary">
+
+            <div className="max-padd-container !px-0 mt-18 pb-16">
+
+                { /* Container */ }
+                <div className="flex flex-col sm:flex-row gap-6">
+
+                    { /* Filters - Left Side */ }
+                    <div className="min-w-72 bg-white p-4 pl-6 lg:pl-12 rounded-r-xl my-4">
+                        
+                        { /* Sort By Price */ }
+                        <div className="py-3">
+
+                            <h5 className="mb-3">Sort By</h5>
+                            <select value={selectedSort} onChange={(e) => setSelectedSort(e.target.value)} className="bg-primary ring-1 ring-slate-900/10 outline-none text-gray-30 text-sm font-semibold text-gray-50 h-8 w-full rounded px-2">
+
+                                {
+                                    sortOptions.map((sort, index) => (
+
+                                        <option value={sort} key={index}>{sort}</option>
+                                    ))
+                                }
+                            </select>
+                        </div>
+                        
+                        { /* Car Type */ }
+                        <div className="p-5 mt-5 bg-primary rounded-xl">
+
+                            <h5 className="mb-4">Car Type</h5>
+                            {
+                                bodyType.map((type) => (
+
+                                    <label key={type} className="flex gap-2 text-sm font-semibold text-gray-50 mb-1">
+                                        
+                                        <input type="checkbox" checked={selectedFilters.bodyType.includes(type)} onChange={(e) => handleFilterChange(e.target.checked, type, "bodyType")} />
+                                        {type}
+                                    </label>
+                                ))
+                            }
+                        </div>
+
+                        { /* Price Range */ }
+                        <div className="p-5 mt-5 bg-primary rounded-xl">
+
+                            <h5 className="mb-4">Price Range</h5>
+                            {
+                                priceRange.map((price) => (
+
+                                    <label key={price} className="flex gap-2 text-sm font-semibold text-gray-50 mb-1">
+                                        
+                                        <input type="checkbox" checked={selectedFilters.priceRange.includes(price)} onChange={(e) => handleFilterChange(e.target.checked, price, "priceRange")} />
+                                        {currency}{price}
+                                    </label>
+                                ))
+                            }
+                        </div>
+
+                    </div>
+
+                    { /* Filtered Cars - Right Side */ }
+                    <div className="max-sm:px-10 sm:pr-10 bg-white p-4 rounded-2xl my-4">
+                        
+                        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-8">
+
+                            {getPaginatedCard().length > 0 ? (
+
+                                getPaginatedCard().map((car, index) => (
+
+                                    <Item key={index} car={car} />
+                                ))
+                            ) : (
+
+                                <p className="capitalize">No Cars Found For Selected Filters.</p>
+                            )}
+                        </div>
+                        
+                        {/* Pagination */}
+                        <div className="flexCenter flex flex-wrap mt-14 mb-10 gap-3">
+
+                            <button disabled={currPage === 1} onClick={() => setCurrPage(prev => prev - 1)} className={`btn-solid !py-1 !px-3 ${currPage === 1 && "opacity-50 cursor-not-allowed"}`}>Previous</button>
+                            {
+                                Array.from({length: totalPages}, (_, index) => (
+
+                                    <button key={index + 1} onClick={() => setCurrPage(index + 1)} className={`btn-outline h-8 w-8 p-0 flexCenter ${currPage === index + 1 && "btn-light"}`}>{index + 1}</button>
+                                ))
+                            }
+                            <button disabled={currPage === totalPages} onClick={() => setCurrPage(prev => prev + 1)} className={`btn-solid !py-1 !px-3 ${currPage === totalPages && "opacity-50 cursor-not-allowed"}`}>Next</button>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+export default Listing
